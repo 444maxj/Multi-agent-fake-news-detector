@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "factcheck"
+version = "1.0.0"
+description = "Multi-Agent Fake News Detector System"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "groq==0.13.0",
+    "tavily-python==0.5.0",
+    "wikipedia-api==0.7.1",
+    "streamlit==1.41.0",
+    "python-dotenv==1.0.1",
+    "requests==2.32.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.8.4",
+    "mypy==1.13.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pyright]
+extraPaths = ["src"]
+
+[tool.mypy]
+pythonpath = ["src"]
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

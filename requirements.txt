@@ -1,0 +1,11 @@
+# Core Dependencies
+groq==0.13.0
+tavily-python==0.5.0
+wikipedia-api==0.7.1
+streamlit==1.41.0
+python-dotenv==1.0.1
+requests==2.32.3
+
+# Development & Code Quality Tools
+ruff==0.8.4
+mypy==1.13.0
