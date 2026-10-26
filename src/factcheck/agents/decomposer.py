@@ -1,61 +1,38 @@
 """
-Agent Decomposeur.
-Analyse une affirmation et la decoupe en 3 a 5 sous-questions verificables
-en utilisant le raisonnement Chain-of-Thought.
+Agent Décomposeur avec validation Pydantic et repli sécurisé.
 """
 
-import json
-from factcheck.core.llm import call_groq_chat
+import logging
+
+from factcheck.core.llm_json import call_json
+from factcheck.core.logging_setup import traced
+from factcheck.core.schemas import SubQuestions
+
+log = logging.getLogger(__name__)
+
+SYSTEM_PROMPT = """Tu es un agent expert en décomposition d'affirmations pour le fact-checking.
+Ta mission est d'analyser l'affirmation et d'en extraire entre 2 et 5 sous-questions vérifiables,
+précises, indépendantes et cherchables dans des bases documentaires.
+Réponds au format JSON avec la clé 'questions' contenant la liste des sous-questions.
+Exemple : {"questions": ["question 1", "question 2"]}"""
 
 
-def decomposer_agent(affirmation: str) -> list:
+@traced("decomposer")
+def decomposer_agent(affirmation: str) -> list[str]:
     """
-    Transforme une affirmation en sous-questions verificables.
-
-    Parametres :
-        affirmation : l'affirmation brute soumise par l'utilisateur
-
-    Retourne :
-        liste de strings (sous-questions)
+    Transforme une affirmation en sous-questions vérifiables.
+    En cas d'échec ou d'erreur LLM, repli sur l'affirmation brute.
     """
-    prompt = f"""Tu es un agent specialise en decomposition d'affirmations pour le fact-checking.
+    user_prompt = f"Affirmation à analyser : \"{affirmation}\""
 
-Affirmation a analyser : "{affirmation}"
-
-Etape 1 : Identifie les elements factuels cles de cette affirmation
-          (chiffres, dates, personnes, evenements, causalites).
-
-Etape 2 : Pour chaque element, formule une sous-question precise et independante
-          qui peut etre verifiee par une recherche documentaire.
-
-Regles :
-- Entre 3 et 5 sous-questions maximum
-- Chaque question doit etre autonome et recherchable
-- Eviter les questions trop vagues ou trop larges
-- Privilegier les questions qui ont une reponse factuelle claire
-
-Reponds UNIQUEMENT avec un tableau JSON de strings, sans texte supplementaire.
-Format attendu : ["question 1", "question 2", "question 3"]"""
-
-    texte = call_groq_chat(
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=1000,
-        temperature=0.0
+    result = call_json(
+        schema=SubQuestions,
+        system=SYSTEM_PROMPT,
+        user=user_prompt,
+        list_key="questions",
+        fallback=SubQuestions(questions=[affirmation]),
+        temperature=0.0,
     )
 
-    # Nettoyage des balises markdown si presentes
-    if "```" in texte:
-        texte = texte.split("```")[1]
-        if texte.startswith("json"):
-            texte = texte[4:]
-
-    try:
-        sous_questions = json.loads(texte.strip())
-        # Validation : s'assurer que c'est bien une liste de strings
-        if not isinstance(sous_questions, list):
-            raise ValueError("Le resultat n'est pas une liste")
-        return sous_questions
-    except (json.JSONDecodeError, ValueError) as e:
-        print(f"[ERREUR decomposer] Impossible de parser la reponse : {e}")
-        # Fallback : retourner l'affirmation comme unique question
-        return [affirmation]
+    log.info("decomposition_done", extra={"count": len(result.questions)})
+    return result.questions

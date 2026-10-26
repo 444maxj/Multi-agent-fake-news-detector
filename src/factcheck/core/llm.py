@@ -1,39 +1,29 @@
 """
-Helper pour les appels Groq avec sélection et repli automatique de modèle.
+Fournisseur client LLM utilisant l'API OpenAI compatible avec Groq.
 """
 
 import os
-import groq
-from factcheck.core.config import FALLBACK_GROQ_MODELS
+
+from openai import OpenAI
+
+from factcheck.core.config import get_groq_model
 
 
-def call_groq_chat(messages: list, max_tokens: int = 2000, temperature: float = 0.0) -> str:
+def get_client() -> tuple[OpenAI, str]:
     """
-    Execute un appel chat completion sur Groq en testant les modeles disponibles.
+    Initialise le client OpenAI pointant vers l'API Groq (endpoint compatible).
+    Retourne (client, nom_du_modele).
     """
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise EnvironmentError(
-            "GROQ_API_KEY manquante. Obtenez une cle sur console.groq.com"
+        raise OSError(
+            "GROQ_API_KEY manquante. Renseignez votre cle dans le fichier .env (console.groq.com)."
         )
-    client = groq.Groq(api_key=api_key)
 
-    dernier_erreur = None
-    for modele in FALLBACK_GROQ_MODELS:
-        try:
-            reponse = client.chat.completions.create(
-                model=modele,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature
-            )
-            return reponse.choices[0].message.content.strip()
-        except Exception as e:
-            if "does not exist" in str(e) or "model_not_found" in str(e) or "NotFoundError" in type(e).__name__:
-                dernier_erreur = e
-                continue
-            raise e
-
-    if dernier_erreur:
-        raise dernier_erreur
-    raise RuntimeError("Aucun modele Groq n'a pu repondre.")
+    base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+    client = OpenAI(
+        api_key=api_key,
+        base_url=base_url
+    )
+    model = get_groq_model()
+    return client, model
